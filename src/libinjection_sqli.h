@@ -170,6 +170,7 @@ struct libinjection_sqli_state {
      */
     int stats_tokens;
 
+    int tab_level;
 };
 
 typedef struct libinjection_sqli_state sfilter;
