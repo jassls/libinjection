@@ -90,6 +90,22 @@ typedef enum {
         printf(fmt,  ##__VA_ARGS__);   \
 } while (0)
 
+void print_token(struct libinjection_sqli_state *sf)
+{
+    sf->tab_level++;
+    funclog(sf, "\n");
+    funclog(sf, "Print token vec:\n");
+    funclog(sf, "tokenvec 0 [%s], type [%c]\n", sf->tokenvec[0].val, sf->tokenvec[0].type);
+    funclog(sf, "tokenvec 1 [%s], type [%c]\n", sf->tokenvec[1].val, sf->tokenvec[1].type);
+    funclog(sf, "tokenvec 2 [%s], type [%c]\n", sf->tokenvec[2].val, sf->tokenvec[2].type);
+    funclog(sf, "tokenvec 3 [%s], type [%c]\n", sf->tokenvec[3].val, sf->tokenvec[3].type);
+    funclog(sf, "tokenvec 4 [%s], type [%c]\n", sf->tokenvec[4].val, sf->tokenvec[4].type);
+    funclog(sf, "tokenvec 5 [%s], type [%c]\n", sf->tokenvec[5].val, sf->tokenvec[5].type);
+    funclog(sf, "tokenvec 6 [%s], type [%c]\n", sf->tokenvec[6].val, sf->tokenvec[6].type);
+    funclog(sf, "tokenvec 7 [%s], type [%c]\n", sf->tokenvec[7].val, sf->tokenvec[7].type);
+    sf->tab_level--;
+}
+
 /**
  * Initializes parsing state
  *
@@ -281,7 +297,9 @@ static char bsearch_keyword_type(struct libinjection_sqli_state *sf, const char 
             right = pos;
         }
     }
+
     if ((left == right) && cstrcasecmp(keywords[left].word, key, len) == 0) {
+        funclog(sf, "bsearch_keyword_type hit [%s]\n", keywords[left].word);
         return keywords[left].type;
     } else {
         return CHAR_NULL;
@@ -606,6 +624,7 @@ static size_t parse_operator2(struct libinjection_sqli_state * sf)
     sf->tab_level++;
     ch = sf->lookup(sf, LOOKUP_OPERATOR, cs + pos, 2);
     sf->tab_level--;
+    funclog(sf, "callback %s lookup result %c\n", __func__, ch);
     if (ch != CHAR_NULL) {
         st_assign(sf, sf->current, ch, pos, 2, cs+pos, __LINE__);
         return pos + 2;
@@ -957,11 +976,12 @@ static size_t parse_word(struct libinjection_sqli_state * sf)
         sf->tab_level++;
         ch = sf->lookup(sf, LOOKUP_WORD, sf->current->val, wlen);
         sf->tab_level--;
+        funclog(sf, "parse_word: lookup result %c(%p)\n", ch, ch);
         if (ch == CHAR_NULL) {
             ch = TYPE_BAREWORD;
         }
         sf->current->type = ch;
-        funclog(sf, "parse_word: set finghtprint %c", ch);
+        funclog(sf, "parse_word: set finghtprint %c\n", ch);
     }
     return pos + wlen;
 }
@@ -1245,6 +1265,7 @@ int libinjection_sqli_tokenize(struct libinjection_sqli_state * sf)
     stoken_t *current = sf->current;
     const char *s = sf->s;
     const size_t slen = sf->slen;
+    size_t  prev_pos;
 
     if (slen == 0) {
         return FALSE;
@@ -1278,11 +1299,15 @@ int libinjection_sqli_tokenize(struct libinjection_sqli_state * sf)
          * Porting Note: this is mapping of char to function
          *   charparsers[ch]()
          */
-        printf("\n< char [%c] handler\n", ch);
+        printf("\n char [%c] handler\n", ch);
        sf->tab_level++;
         fnptr = char_parse_map[ch];
-        
+
+        prev_pos = *pos;
         *pos = (*fnptr) (sf);
+
+        funclog(sf, "libinjection_sqli_tokenize pos %d -> %d, slen [%d]\n", (int)prev_pos, (int)*pos, (int)slen);
+
         sf->tab_level--;
 
         /*
@@ -1430,7 +1455,7 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
      */
     sf->current = &(sf->tokenvec[0]);
     while (more) {
-        printf("\nEnter first sqli_tokenize\n");
+        printf("\n<--- Enter first sqli_tokenize\n");
         more = libinjection_sqli_tokenize(sf);
         if ( ! (sf->current->type == TYPE_COMMENT ||
                 sf->current->type == TYPE_LEFTPARENS ||
@@ -1439,7 +1464,9 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
             break;
         }
     }
-printf("\nfirst libinjection_sqli_tokenize loop out, more %d\n", more);
+    print_token(sf);
+    printf("\n---> first libinjection_sqli_tokenize loop out, more %d\n\n\n", more);
+
     if (! more) {
         /* If input was only comments, unary or (, then exit */
         return 0;
@@ -1499,6 +1526,8 @@ printf("\nfirst libinjection_sqli_tokenize loop out, more %d\n", more);
         }
 
         if (! more || left >= LIBINJECTION_SQLI_MAX_TOKENS) {
+            funclog(sf, "--------------while (1) break at line %d--------------- more %d, left %d, LIBINJECTION_SQLI_MAX_TOKENS %d\n",
+                   __LINE__, more, (int)left, LIBINJECTION_SQLI_MAX_TOKENS);
             left = pos;
             break;
         }
@@ -1506,9 +1535,11 @@ printf("\nfirst libinjection_sqli_tokenize loop out, more %d\n", more);
         /* get up to two tokens */
         while (more && pos <= LIBINJECTION_SQLI_MAX_TOKENS && (pos - left) < 2) {
             sf->current = &(sf->tokenvec[pos]);
-            printf("\nEnter second sqli_tokenize\n");
+            printf("<--- Enter second sqli_tokenize\n");
             more = libinjection_sqli_tokenize(sf);
-            printf("second libinjection_sqli_tokenize loop out, more %d\n", more);
+            print_token(sf);
+            printf("---> second libinjection_sqli_tokenize loop out, more %d\n\n\n", more);
+            
             if (more) {
                 if (sf->current->type == TYPE_COMMENT) {
                     st_copy(&last_comment, sf->current);
@@ -1529,7 +1560,7 @@ printf("\nfirst libinjection_sqli_tokenize loop out, more %d\n", more);
          * "foo" "bar" is valid SQL
          * just ignore second string
          */
-printf("1111\n");
+printf("( Before if case check\n");
         if (sf->tokenvec[left].type == TYPE_STRING && sf->tokenvec[left+1].type == TYPE_STRING) {
             printf("Enter if check 1\n");
             pos -= 1;
@@ -1733,6 +1764,7 @@ printf("1111\n");
              */
             if (sf->tokenvec[left+1].len == 0) {
                 sf->tokenvec[left+1].type = TYPE_EVIL;
+                funclog(sf, "--------------while (1) return at line %d---------------\n", __LINE__);
                 return (int)(left+2);
             }
             /* weird ODBC / MYSQL  {foo expr} --> expr
@@ -1749,9 +1781,9 @@ printf("1111\n");
             sf->stats_folds += 1;
             continue;
         } else {
-            printf("Enter if check no match \n");
+            printf("no match...\n");
         }
-printf("2222\n");
+printf(") After if check\n\n");
 
         /* all cases of handing 2 tokens is done
            and nothing matched.  Get one more token
@@ -1759,9 +1791,11 @@ printf("2222\n");
         FOLD_DEBUG;
         while (more && pos <= LIBINJECTION_SQLI_MAX_TOKENS && pos - left < 3) {
             sf->current = &(sf->tokenvec[pos]);
-            printf("\nEnter third sqli_tokenize\n");
+            printf("<--- Enter third sqli_tokenize\n");
             more = libinjection_sqli_tokenize(sf);
-            printf("third libinjection_sqli_tokenize loop out, more %d\n", more);
+            print_token(sf);
+            printf("---> third libinjection_sqli_tokenize loop out, more %d\n\n\n", more);
+            
             if (more) {
                 if (sf->current->type == TYPE_COMMENT) {
                     st_copy(&last_comment, sf->current);
@@ -1996,6 +2030,7 @@ const char* libinjection_sqli_fingerprint(struct libinjection_sqli_state * sql_s
         sql_state->fingerprint[i] = sql_state->tokenvec[i].type;
     }
 
+    print_token(sql_state);
 printf("libinjection_sqli_fingerprint sql_state->fingerprint [%s]", sql_state->fingerprint);
 
     /*
@@ -2037,6 +2072,9 @@ int libinjection_sqli_check_fingerprint(struct libinjection_sqli_state* sql_stat
 char libinjection_sqli_lookup_word(struct libinjection_sqli_state *sql_state, int lookup_type,
                                    const char* str, size_t len)
 {
+    funclog(sql_state, "Enter libinjection_sqli_lookup_word, type is fingerprint %d\n",
+            lookup_type == LOOKUP_FINGERPRINT ? 1 : 0);
+
     if (lookup_type == LOOKUP_FINGERPRINT) {
         return libinjection_sqli_check_fingerprint(sql_state) ? 'X' : '\0';
     } else {
