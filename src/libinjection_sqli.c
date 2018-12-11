@@ -1299,7 +1299,7 @@ int libinjection_sqli_tokenize(struct libinjection_sqli_state * sf)
          * Porting Note: this is mapping of char to function
          *   charparsers[ch]()
          */
-        printf("\n char [%c] handler\n", ch);
+        funclog(sf, "char [%c] handler\n", ch);
        sf->tab_level++;
         fnptr = char_parse_map[ch];
 
@@ -1447,7 +1447,7 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
 
     int more = 1;
 
-    printf("Enter libinjection_sqli_fold\n");
+    funclog(sf, "Enter libinjection_sqli_fold\n");
 
     st_clear(&last_comment);
 
@@ -1456,7 +1456,7 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
      */
     sf->current = &(sf->tokenvec[0]);
     while (more) {
-        printf("\n<--- Enter first sqli_tokenize\n");
+        funclog(sf, "<--- Enter first sqli_tokenize\n\n");
         more = libinjection_sqli_tokenize(sf);
         if ( ! (sf->current->type == TYPE_COMMENT ||
                 sf->current->type == TYPE_LEFTPARENS ||
@@ -1466,7 +1466,7 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
         }
     }
     print_token(sf);
-    printf("\n---> first libinjection_sqli_tokenize loop out, more %d\n\n\n", more);
+    funclog(sf, "---> first libinjection_sqli_tokenize loop out, more %d\n\n\n", more);
 
     if (! more) {
         /* If input was only comments, unary or (, then exit */
@@ -1479,7 +1479,7 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
 
     while (1) {
         FOLD_DEBUG;
-        //printf("%d \t more=%d  pos=%d left=%d\n", __LINE__, more, (int)pos, (int)left);
+        //funclog(sf, "%d \t more=%d  pos=%d left=%d\n", __LINE__, more, (int)pos, (int)left);
 
         /* do we have all the max number of tokens?  if so do
          * some special cases for 5 tokens
@@ -1541,10 +1541,10 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
         /* get up to two tokens */
         while (more && pos <= LIBINJECTION_SQLI_MAX_TOKENS && (pos - left) < 2) {
             sf->current = &(sf->tokenvec[pos]);
-            printf("<--- Enter second sqli_tokenize, pos %d\n", (int)pos);
+            funclog(sf, "<--- Enter second sqli_tokenize, pos %d\n", (int)pos);
             more = libinjection_sqli_tokenize(sf);
             print_token(sf);
-            printf("---> second libinjection_sqli_tokenize loop out, more %d\n\n\n", more);
+            funclog(sf, "---> second libinjection_sqli_tokenize loop out, more %d\n\n\n", more);
             
             if (more) {
                 if (sf->current->type == TYPE_COMMENT) {
@@ -1799,10 +1799,10 @@ funclog(sf, ") After two tokens fold\n\n");
         FOLD_DEBUG;
         while (more && pos <= LIBINJECTION_SQLI_MAX_TOKENS && pos - left < 3) {
             sf->current = &(sf->tokenvec[pos]);
-            printf("<--- Enter third sqli_tokenize\n");
+            funclog(sf, "<--- Enter third sqli_tokenize\n");
             more = libinjection_sqli_tokenize(sf);
             print_token(sf);
-            printf("---> third libinjection_sqli_tokenize loop out, more %d\n\n\n", more);
+            funclog(sf, "---> third libinjection_sqli_tokenize loop out, more %d\n\n\n", more);
             
             if (more) {
                 if (sf->current->type == TYPE_COMMENT) {
@@ -2035,8 +2035,10 @@ const char* libinjection_sqli_fingerprint(struct libinjection_sqli_state * sql_s
 
     libinjection_sqli_reset(sql_state, flags);
 
+    sql_state->tab_level++;
     tlen = libinjection_sqli_fold(sql_state);
     funclog(sql_state, "libinjection_sqli_fold result, tlen %d\n", tlen);
+
 
     /* Check for magic PHP backquote comment
      * If:
@@ -2059,7 +2061,7 @@ const char* libinjection_sqli_fingerprint(struct libinjection_sqli_state * sql_s
     }
 
     print_token(sql_state);
-funclog(sql_state, "libinjection_sqli_fingerprint sql_state->fingerprint [%s]\n", sql_state->fingerprint);
+    funclog(sql_state, "libinjection_sqli_fingerprint sql_state->fingerprint [%s]\n", sql_state->fingerprint);
 
     /*
      * make the fingerprint pattern a c-string (null delimited)
@@ -2087,7 +2089,7 @@ funclog(sql_state, "libinjection_sqli_fingerprint sql_state->fingerprint [%s]\n"
         sql_state->tokenvec[1].type = CHAR_NULL;
     }
 
-
+    sql_state->tab_level--;
     return sql_state->fingerprint;
 }
 
@@ -2100,14 +2102,19 @@ int libinjection_sqli_check_fingerprint(struct libinjection_sqli_state* sql_stat
 char libinjection_sqli_lookup_word(struct libinjection_sqli_state *sql_state, int lookup_type,
                                    const char* str, size_t len)
 {
+    char ret;
+    sql_state->tab_level++;
     funclog(sql_state, "Enter libinjection_sqli_lookup_word, type is fingerprint %d\n",
             lookup_type == LOOKUP_FINGERPRINT ? 1 : 0);
 
     if (lookup_type == LOOKUP_FINGERPRINT) {
-        return libinjection_sqli_check_fingerprint(sql_state) ? 'X' : '\0';
+        ret = libinjection_sqli_check_fingerprint(sql_state) ? 'X' : '\0';
     } else {
-        return bsearch_keyword_type(sql_state, str, len, sql_keywords, sql_keywords_sz);
+        ret = bsearch_keyword_type(sql_state, str, len, sql_keywords, sql_keywords_sz);
     }
+
+    sql_state->tab_level--;
+    return ret;
 }
 
 int libinjection_sqli_blacklist(struct libinjection_sqli_state* sql_state)
@@ -2393,17 +2400,22 @@ int libinjection_is_sqli(struct libinjection_sqli_state * sql_state)
     /*
      * test input "as-is"
      */
+    funclog(sql_state, "context 1 as-is:\n");
     libinjection_sqli_fingerprint(sql_state, FLAG_QUOTE_NONE | FLAG_SQL_ANSI);
+
     if (sql_state->lookup(sql_state, LOOKUP_FINGERPRINT,
                           sql_state->fingerprint, strlen(sql_state->fingerprint))) {
+        funclog(sql_state, "context 1 as-is result is sqli:\n");
         return TRUE;
     } else if (reparse_as_mysql(sql_state)) {
         libinjection_sqli_fingerprint(sql_state, FLAG_QUOTE_NONE | FLAG_SQL_MYSQL);
         if (sql_state->lookup(sql_state, LOOKUP_FINGERPRINT,
                               sql_state->fingerprint, strlen(sql_state->fingerprint))) {
+            funclog(sql_state, "context 1 as-is result is sqli:\n");
             return TRUE;
         }
     }
+    funclog(sql_state, "context 1 as-is result is NOT sqli:\n\n\n");
 
     /*
      * if input has a single_quote, then
@@ -2415,29 +2427,40 @@ int libinjection_is_sqli(struct libinjection_sqli_state * sql_state)
      *
      */
     if (memchr(s, CHAR_SINGLE, slen)) {
+        funclog(sql_state, "context 2 single quote:\n");
         libinjection_sqli_fingerprint(sql_state, FLAG_QUOTE_SINGLE | FLAG_SQL_ANSI);
         if (sql_state->lookup(sql_state, LOOKUP_FINGERPRINT,
                               sql_state->fingerprint, strlen(sql_state->fingerprint))) {
+            funclog(sql_state, "context 2 single quote result is sqli:\n");
             return TRUE;
         } else if (reparse_as_mysql(sql_state)) {
             libinjection_sqli_fingerprint(sql_state, FLAG_QUOTE_SINGLE | FLAG_SQL_MYSQL);
             if (sql_state->lookup(sql_state, LOOKUP_FINGERPRINT,
                                   sql_state->fingerprint, strlen(sql_state->fingerprint))) {
+                funclog(sql_state, "context 2 single quote result is sqli:\n");
                 return TRUE;
             }
         }
+
+        funclog(sql_state, "context 2 single quote result is NOT sqli:\n");
     }
 
     /*
      * same as above but with a double-quote "
      */
     if (memchr(s, CHAR_DOUBLE, slen)) {
+        funclog(sql_state, "context 3 double quote:\n");
         libinjection_sqli_fingerprint(sql_state, FLAG_QUOTE_DOUBLE | FLAG_SQL_MYSQL);
         if (sql_state->lookup(sql_state, LOOKUP_FINGERPRINT,
                               sql_state->fingerprint, strlen(sql_state->fingerprint))) {
+            funclog(sql_state, "context 3 double quote result is sqli\n");
             return TRUE;
         }
+
+        funclog(sql_state, "context 3 double quote result is NOT sqli\n");
     }
+
+    funclog(sql_state, "Finally result is NOT sqli\n");
 
     /*
      * Hurray, input is not SQLi
