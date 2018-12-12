@@ -684,6 +684,9 @@ static size_t parse_string_core(struct libinjection_sqli_state * sf, const char 
     /*
      * offset is to skip the perhaps first quote char
      */
+
+    funclog(sf, "Enter parse_string_core\n");
+
     const char *qpos =
         (const char *) memchr((const void *) (cs + pos + offset), delim,
                               len - pos - offset);
@@ -1299,12 +1302,15 @@ int libinjection_sqli_tokenize(struct libinjection_sqli_state * sf)
          * Porting Note: this is mapping of char to function
          *   charparsers[ch]()
          */
-        funclog(sf, "char [%c] handler\n", ch);
-       sf->tab_level++;
+        sf->tab_level++;
+        funclog(sf, "Invoke char [%c] callback handler\n", ch);
+       
         fnptr = char_parse_map[ch];
 
         prev_pos = *pos;
+        sf->tab_level++;
         *pos = (*fnptr) (sf);
+        sf->tab_level--;
 
         funclog(sf, "libinjection_sqli_tokenize pos %d -> %d, slen [%d]\n", (int)prev_pos, (int)*pos, (int)slen);
 
@@ -1447,8 +1453,6 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
 
     int more = 1;
 
-    funclog(sf, "Enter libinjection_sqli_fold\n");
-
     st_clear(&last_comment);
 
     /* Skip all initial comments, right-parens ( and unary operators
@@ -1567,11 +1571,11 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
          * "foo" "bar" is valid SQL
          * just ignore second string
          */
-funclog(sf, "( Before two tokens fold\n");
+        funclog(sf, "\n");
         if (sf->tokenvec[left].type == TYPE_STRING && sf->tokenvec[left+1].type == TYPE_STRING) {
             pos -= 1;
             sf->stats_folds += 1;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_SEMICOLON && sf->tokenvec[left+1].type == TYPE_SEMICOLON) {
             /* not sure how various engines handle
@@ -1581,7 +1585,7 @@ funclog(sf, "( Before two tokens fold\n");
              */
             pos -= 1;
             sf->stats_folds += 1;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_OPERATOR ||
                     sf->tokenvec[left].type == TYPE_LOGIC_OPERATOR) &&
@@ -1590,7 +1594,7 @@ funclog(sf, "( Before two tokens fold\n");
             pos -= 1;
             sf->stats_folds += 1;
             left = 0;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_LEFTPARENS &&
                    st_is_unary_op(&sf->tokenvec[left+1])) {
@@ -1599,7 +1603,7 @@ funclog(sf, "( Before two tokens fold\n");
             if (left > 0) {
                 left -= 1;
             }
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             continue;
         } else if (syntax_merge_words(sf, &sf->tokenvec[left], &sf->tokenvec[left+1])) {
             pos -= 1;
@@ -1607,7 +1611,7 @@ funclog(sf, "( Before two tokens fold\n");
             if (left > 0) {
                 left -= 1;
             }
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_SEMICOLON &&
                    sf->tokenvec[left+1].type == TYPE_FUNCTION &&
@@ -1620,7 +1624,7 @@ funclog(sf, "( Before two tokens fold\n");
              * if found after a semicolon, convert from 'f' type to 'T' type
              */
             sf->tokenvec[left+1].type = TYPE_TSQL;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos, (int)pos,  __LINE__);
             /* left += 2; */
             continue; /* reparse everything, but we probably can advance left, and pos */
         } else if ((sf->tokenvec[left].type == TYPE_BAREWORD || sf->tokenvec[left].type == TYPE_VARIABLE) &&
@@ -1651,7 +1655,7 @@ funclog(sf, "( Before two tokens fold\n");
              * password CAN be a function, coalesce CAN be a function
              */
             sf->tokenvec[left].type = TYPE_FUNCTION;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos, (int)pos,  __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_KEYWORD && (
                        cstrcasecmp("IN", sf->tokenvec[left].val, sf->tokenvec[left].len) == 0 ||
@@ -1680,7 +1684,7 @@ funclog(sf, "( Before two tokens fold\n");
              * two use cases   "foo" LIKE "BAR" (normal operator)
              *  "foo" = LIKE(1,2)
              */
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos, (int)pos,  __LINE__);
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_OPERATOR) && (
                        cstrcasecmp("LIKE", sf->tokenvec[left].val, sf->tokenvec[left].len) == 0 ||
@@ -1691,7 +1695,7 @@ funclog(sf, "( Before two tokens fold\n");
                  */
                 sf->tokenvec[left].type = TYPE_FUNCTION;
             }
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos, (int)pos,  __LINE__);
         } else if (sf->tokenvec[left].type == TYPE_SQLTYPE &&
                    (sf->tokenvec[left+1].type == TYPE_BAREWORD ||
                     sf->tokenvec[left+1].type == TYPE_NUMBER ||
@@ -1705,7 +1709,7 @@ funclog(sf, "( Before two tokens fold\n");
             pos -= 1;
             sf->stats_folds += 1;
             left = 0;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_COLLATE &&
                    sf->tokenvec[left+1].type == TYPE_BAREWORD) {
@@ -1717,18 +1721,18 @@ funclog(sf, "( Before two tokens fold\n");
                 sf->tokenvec[left+1].type = TYPE_SQLTYPE;
                 left = 0;
             }
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos, (int)pos,  __LINE__);
         } else if (sf->tokenvec[left].type == TYPE_BACKSLASH) {
             if (st_is_arithmetic_op(&(sf->tokenvec[left+1]))) {
                 /* very weird case in TSQL where '\%1' is parsed as '0 % 1', etc */
                 sf->tokenvec[left].type = TYPE_NUMBER;
-                funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos, (int)pos,  __LINE__);
+                funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos, (int)pos,  __LINE__);
             } else {
                 /* just ignore it.. Again T-SQL seems to parse \1 as "1" */
                 st_copy(&sf->tokenvec[left], &sf->tokenvec[left+1]);
                 pos -= 1;
                 sf->stats_folds += 1;
-                funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+                funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             }
             left = 0;
             continue;
@@ -1737,14 +1741,14 @@ funclog(sf, "( Before two tokens fold\n");
             pos -= 1;
             left = 0;
             sf->stats_folds += 1;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_RIGHTPARENS &&
                    sf->tokenvec[left+1].type == TYPE_RIGHTPARENS) {
             pos -= 1;
             left = 0;
             sf->stats_folds += 1;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_LEFTBRACE &&
                    sf->tokenvec[left+1].type == TYPE_BAREWORD) {
@@ -1780,18 +1784,18 @@ funclog(sf, "( Before two tokens fold\n");
             left = 0;
             pos -= 2;
             sf->stats_folds += 2;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 2, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 2, (int)pos,  __LINE__);
             continue;
         } else if (sf->tokenvec[left+1].type == TYPE_RIGHTBRACE) {
             pos -= 1;
             left = 0;
             sf->stats_folds += 1;
-            funclog(sf, "!!! Fold two token tokenvec posistion %d -> %d at line %d!!!\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
+            funclog(sf, "**** Fold two token tokenvec posistion %d -> %d at line %d****\n\n\n", (int)pos + 1, (int)pos,  __LINE__);
             continue;
         } else {
-            funclog(sf, "no fold...\n");
+            funclog(sf, "no two tokens fold...\n");
         }
-funclog(sf, ") After two tokens fold\n\n");
+        funclog(sf, "\n");
 
         /* all cases of handing 2 tokens is done
            and nothing matched.  Get one more token
@@ -1824,26 +1828,26 @@ funclog(sf, ") After two tokens fold\n\n");
         /*
          * now look for three token folding
          */
-funclog(sf, "( Before three tokens fold\n");
+        funclog(sf, "\n");
         if (sf->tokenvec[left].type == TYPE_NUMBER &&
             sf->tokenvec[left+1].type == TYPE_OPERATOR &&
             sf->tokenvec[left+2].type == TYPE_NUMBER) {
             pos -= 2;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 2, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 2, (int)pos, __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_OPERATOR &&
                    sf->tokenvec[left+1].type != TYPE_LEFTPARENS &&
                    sf->tokenvec[left+2].type == TYPE_OPERATOR) {
             left = 0;
             pos -= 2;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 2, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 2, (int)pos, __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_LOGIC_OPERATOR &&
                    sf->tokenvec[left+2].type == TYPE_LOGIC_OPERATOR) {
             pos -= 2;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 2, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 2, (int)pos, __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_VARIABLE &&
                    sf->tokenvec[left+1].type == TYPE_OPERATOR &&
@@ -1852,7 +1856,7 @@ funclog(sf, "( Before three tokens fold\n");
                     sf->tokenvec[left+2].type == TYPE_BAREWORD)) {
             pos -= 2;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 2, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 2, (int)pos, __LINE__);
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_BAREWORD ||
                     sf->tokenvec[left].type == TYPE_NUMBER ) &&
@@ -1861,7 +1865,7 @@ funclog(sf, "( Before three tokens fold\n");
                     sf->tokenvec[left+2].type == TYPE_BAREWORD)) {
             pos -= 2;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 2, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 2, (int)pos, __LINE__);
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_BAREWORD ||
                     sf->tokenvec[left].type == TYPE_NUMBER ||
@@ -1872,7 +1876,7 @@ funclog(sf, "( Before three tokens fold\n");
                    sf->tokenvec[left+2].type == TYPE_SQLTYPE) {
             pos -= 2;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 2, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 2, (int)pos, __LINE__);
             sf->stats_folds += 2;
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_BAREWORD ||
@@ -1886,7 +1890,7 @@ funclog(sf, "( Before three tokens fold\n");
                     sf->tokenvec[left+2].type == TYPE_VARIABLE)) {
             pos -= 2;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 2, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 2, (int)pos, __LINE__);
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_EXPRESSION ||
                     sf->tokenvec[left].type == TYPE_GROUP ||
@@ -1899,7 +1903,7 @@ funclog(sf, "( Before three tokens fold\n");
             st_copy(&sf->tokenvec[left+1], &sf->tokenvec[left+2]);
             pos -= 1;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 1, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 1, (int)pos, __LINE__);
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_KEYWORD ||
                     sf->tokenvec[left].type == TYPE_EXPRESSION ||
@@ -1916,7 +1920,7 @@ funclog(sf, "( Before three tokens fold\n");
             st_copy(&sf->tokenvec[left+1], &sf->tokenvec[left+2]);
             pos -= 1;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 1, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 1, (int)pos, __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_COMMA &&
                    st_is_unary_op(&sf->tokenvec[left+1]) &&
@@ -1934,7 +1938,7 @@ funclog(sf, "( Before three tokens fold\n");
             /* pos is >= 3 so this is safe */
             assert(pos >= 3);
             pos -= 3;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 3, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 3, (int)pos, __LINE__);
             continue;
         } else if (sf->tokenvec[left].type == TYPE_COMMA &&
                    st_is_unary_op(&sf->tokenvec[left+1]) &&
@@ -1949,7 +1953,7 @@ funclog(sf, "( Before three tokens fold\n");
             st_copy(&sf->tokenvec[left+1], &sf->tokenvec[left+2]);
             pos -= 1;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 1, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 1, (int)pos, __LINE__);
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_BAREWORD) &&
                    (sf->tokenvec[left+1].type == TYPE_DOT) &&
@@ -1960,7 +1964,7 @@ funclog(sf, "( Before three tokens fold\n");
             assert(pos >= 3);
             pos -= 2;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 2, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 2, (int)pos, __LINE__);
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_EXPRESSION) &&
                    (sf->tokenvec[left+1].type == TYPE_DOT) &&
@@ -1969,7 +1973,7 @@ funclog(sf, "( Before three tokens fold\n");
             st_copy(&sf->tokenvec[left+1], &sf->tokenvec[left+2]);
             pos -= 1;
             left = 0;
-            funclog(sf, "!!! fold three tokens tokenvec position %d -> %d at line %d !!!\n", (int)pos + 1, (int)pos, __LINE__);
+            funclog(sf, "**** fold three tokens tokenvec position %d -> %d at line %d ****\n\n\n", (int)pos + 1, (int)pos, __LINE__);
             continue;
         } else if ((sf->tokenvec[left].type == TYPE_FUNCTION) &&
                    (sf->tokenvec[left+1].type == TYPE_LEFTPARENS) &&
@@ -1985,10 +1989,9 @@ funclog(sf, "( Before three tokens fold\n");
                 sf->tokenvec[left].type = TYPE_BAREWORD;
             }
         } else {
-            funclog(sf, "no fold ...\n");
+            funclog(sf, "no three tokens fold ...\n");
         }
-
-funclog(sf, ") After three tokens fold\n");
+        funclog(sf, "\n");
 
         /* no folding -- assume left-most token is
            is good, now use the existing 2 tokens --
