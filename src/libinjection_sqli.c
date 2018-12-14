@@ -95,14 +95,14 @@ void print_token(struct libinjection_sqli_state *sf)
     sf->tab_level++;
     funclog(sf, "\n");
     funclog(sf, "Print token vec:\n");
-    funclog(sf, "tokenvec 0 [%s], type [%c]\n", sf->tokenvec[0].val, sf->tokenvec[0].type);
-    funclog(sf, "tokenvec 1 [%s], type [%c]\n", sf->tokenvec[1].val, sf->tokenvec[1].type);
-    funclog(sf, "tokenvec 2 [%s], type [%c]\n", sf->tokenvec[2].val, sf->tokenvec[2].type);
-    funclog(sf, "tokenvec 3 [%s], type [%c]\n", sf->tokenvec[3].val, sf->tokenvec[3].type);
-    funclog(sf, "tokenvec 4 [%s], type [%c]\n", sf->tokenvec[4].val, sf->tokenvec[4].type);
-    funclog(sf, "tokenvec 5 [%s], type [%c]\n", sf->tokenvec[5].val, sf->tokenvec[5].type);
-    funclog(sf, "tokenvec 6 [%s], type [%c]\n", sf->tokenvec[6].val, sf->tokenvec[6].type);
-    funclog(sf, "tokenvec 7 [%s], type [%c]\n", sf->tokenvec[7].val, sf->tokenvec[7].type);
+    funclog(sf, "tokenvec 0 [%s], type [%c]\n", sf->tokenvec[0].val, sf->tokenvec[0].type != 0 ? sf->tokenvec[0].type : ' ');
+    funclog(sf, "tokenvec 1 [%s], type [%c]\n", sf->tokenvec[1].val, sf->tokenvec[1].type != 0 ? sf->tokenvec[1].type : ' ');
+    funclog(sf, "tokenvec 2 [%s], type [%c]\n", sf->tokenvec[2].val, sf->tokenvec[2].type != 0 ? sf->tokenvec[2].type : ' ');
+    funclog(sf, "tokenvec 3 [%s], type [%c]\n", sf->tokenvec[3].val, sf->tokenvec[3].type != 0 ? sf->tokenvec[3].type : ' ');
+    funclog(sf, "tokenvec 4 [%s], type [%c]\n", sf->tokenvec[4].val, sf->tokenvec[4].type != 0 ? sf->tokenvec[4].type : ' ');
+    funclog(sf, "tokenvec 5 [%s], type [%c]\n", sf->tokenvec[5].val, sf->tokenvec[5].type != 0 ? sf->tokenvec[5].type : ' ');
+    funclog(sf, "tokenvec 6 [%s], type [%c]\n", sf->tokenvec[6].val, sf->tokenvec[6].type != 0 ? sf->tokenvec[6].type : ' ');
+    funclog(sf, "tokenvec 7 [%s], type [%c]\n", sf->tokenvec[7].val, sf->tokenvec[7].type != 0 ? sf->tokenvec[7].type : ' ');
     sf->tab_level--;
 }
 
@@ -624,7 +624,7 @@ static size_t parse_operator2(struct libinjection_sqli_state * sf)
     sf->tab_level++;
     ch = sf->lookup(sf, LOOKUP_OPERATOR, cs + pos, 2);
     sf->tab_level--;
-    funclog(sf, "callback %s lookup result %c\n", __func__, ch);
+    funclog(sf, "callback %s lookup result %c\n", __func__, ch != 0 ? ch : ' ');
     if (ch != CHAR_NULL) {
         st_assign(sf, sf->current, ch, pos, 2, cs+pos, __LINE__);
         return pos + 2;
@@ -979,12 +979,12 @@ static size_t parse_word(struct libinjection_sqli_state * sf)
         sf->tab_level++;
         ch = sf->lookup(sf, LOOKUP_WORD, sf->current->val, wlen);
         sf->tab_level--;
-        funclog(sf, "parse_word: lookup result %c\n", ch);
+        funclog(sf, "parse_word: lookup result %c\n", ch != 0 ? ch : ' ');
         if (ch == CHAR_NULL) {
             ch = TYPE_BAREWORD;
         }
         sf->current->type = ch;
-        funclog(sf, "parse_word: set finghtprint %c\n", ch);
+        funclog(sf, "parse_word: set finghtprint %c\n", ch != 0 ? ch : ' ');
     }
     return pos + wlen;
 }
@@ -1285,6 +1285,8 @@ int libinjection_sqli_tokenize(struct libinjection_sqli_state * sf)
     if (*pos == 0 && (sf->flags & (FLAG_QUOTE_SINGLE | FLAG_QUOTE_DOUBLE))) {
         *pos = parse_string_core(sf, s, slen, 0, current, flag2delim(sf->flags), 0);
         sf->stats_tokens += 1;
+
+        print_token(sf);
         return TRUE;
     }
 
@@ -2110,8 +2112,6 @@ char libinjection_sqli_lookup_word(struct libinjection_sqli_state *sql_state, in
 {
     char ret;
     sql_state->tab_level++;
-    funclog(sql_state, "Enter libinjection_sqli_lookup_word, type is fingerprint %d\n",
-            lookup_type == LOOKUP_FINGERPRINT ? 1 : 0);
 
     if (lookup_type == LOOKUP_FINGERPRINT) {
         ret = libinjection_sqli_check_fingerprint(sql_state) ? 'X' : '\0';
