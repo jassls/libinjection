@@ -1478,6 +1478,7 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
     } else {
         /* it's some other token */
         pos += 1;
+        sf->tab_level++;
         funclog(sf, "tokenvec pos %d -> %d at line %d\n", (int)pos - 1, (int)pos, __LINE__);
     }
 
@@ -1776,6 +1777,7 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
             if (sf->tokenvec[left+1].len == 0) {
                 sf->tokenvec[left+1].type = TYPE_EVIL;
                 funclog(sf, "--------------while (1) return at line %d---------------\n", __LINE__);
+                sf->tab_level--;
                 return (int)(left+2);
             }
             /* weird ODBC / MYSQL  {foo expr} --> expr
@@ -2001,6 +2003,7 @@ int libinjection_sqli_fold(struct libinjection_sqli_state * sf)
         left += 1;
 
     } /* while(1) */
+    sf->tab_level--;
 
     /* if we have 4 or less tokens, and we had a comment token
      * at the end, add it back
